@@ -1,5 +1,5 @@
 /*
-
+This is the serial implementation of RGB to Grayscale conversion
 */
 
 #define STB_IMAGE_IMPLEMENTATION
