@@ -1,10 +1,7 @@
 /*
-For N = 2048000
-
-elapsed time CPU 4.66651
-elapsed time GPU 0.004285
-Exit status: 0
-
+Run on Google Colab GPU runtime T4 GPU
+elapsed time CPU 1389.87 
+elapsed time GPU 7.94866
 */
 
 
@@ -33,9 +30,13 @@ public:
 };
 Timer timer;
 
+__host__ __device__ float f(float a, float b){
+    return a+b;
+}
+
 void add_vectors_CPU(float* A, float* B, float* C, unsigned int N ){
     for(unsigned int i=0; i<N; i++){
-        C[i]=A[i]+B[i];
+        C[i]=f(A[i],B[i]);
     }
 }
 
@@ -69,6 +70,7 @@ void add_vectors_GPU(float* A, float* B, float* C, unsigned int N){
     const unsigned int num_blocks = (N+ threads_per_block -1)/threads_per_block;
     timer.start();
     vec_add_kernel<<< num_blocks,threads_per_block >>>(A_d,B_d,C_d,N);
+    cudaDeviceSynchronize();
     timer.stop();
     timer.print("GPU");
 
@@ -80,10 +82,13 @@ void add_vectors_GPU(float* A, float* B, float* C, unsigned int N){
     cudaFree(A_d);
     cudaFree(B_d);
     cudaFree(C_d);
+
+
 }
 
 int main(){
-    unsigned int N = 2048000;
+    cudaDeviceSynchronize();
+    unsigned int N = 204800000;
 
     float* A = (float*) malloc(N*sizeof(float));
     float* B = (float*) malloc(N*sizeof(float));
