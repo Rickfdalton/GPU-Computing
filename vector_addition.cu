@@ -8,6 +8,7 @@ elapsed time GPU 7.94866
 #include <iostream>
 #include <chrono>
 #include <cuda_runtime.h>
+#include "stb_image.h"
 
 using namespace std;
 
@@ -70,7 +71,7 @@ void add_vectors_GPU(float* A, float* B, float* C, unsigned int N){
     const unsigned int num_blocks = (N+ threads_per_block -1)/threads_per_block;
     timer.start();
     vec_add_kernel<<< num_blocks,threads_per_block >>>(A_d,B_d,C_d,N);
-    cudaDeviceSynchronize();
+    cudaDeviceSynchronize();// wait for the kernel to finish
     timer.stop();
     timer.print("GPU");
 
