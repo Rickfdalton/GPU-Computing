@@ -1,5 +1,8 @@
 /*
 This is the serial implementation of RGB to Grayscale conversion
+results:
+elapsed time GPU 0.160975
+elapsed time CPU 5.66352
 */
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -37,9 +40,9 @@ Timer timer; //initiate timer
 
 void serial_RGB_gray(unsigned char* img, unsigned char* img_gray_serial, unsigned int width, unsigned int height){
     for (unsigned int i=0; i< width*height ; i++){
-        char red = img[3*i + 0];
-        char green = img[3*i + 1];
-        char blue = img[3*i + 2];
+        unsigned char red = img[3*i + 0];
+        unsigned char green = img[3*i + 1];
+        unsigned char blue = img[3*i + 2];
 
         img_gray_serial[i] = static_cast<unsigned char>(
             0.299f*red + 0.587f*green + 0.114f*blue
@@ -58,7 +61,10 @@ int main(){
 
     unsigned char *img_gray_serial = new unsigned char[width * height];// channel is 1
 
+    timer.start();
     serial_RGB_gray(img,img_gray_serial,width,height);
+    timer.stop();
+    timer.print("CPU");
 
     stbi_write_png("serial_gray.png", width, height, 1 , img_gray_serial, width);
     
