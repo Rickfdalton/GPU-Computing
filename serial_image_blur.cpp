@@ -1,5 +1,8 @@
 /*
 This is the serial implementation of Image blur
+elapsed time CPU 42.328
+
+
 */
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -54,9 +57,9 @@ void serial_image_blur(unsigned char* img, unsigned char* img_blur_serial, unsig
                 int green = 0;
                 int blue = 0;
 
-                red = (img[idx_top_left*3]+img[idx_top*3]+img[idx_top_right*3]+img[idx_left*3]+img[idx*3]+img[idx_right*3]+img[idx_bottom_left*3]+img[idx_bottom*3]+img[idx_bottom_right*3])* intensity /9;
-                green = (img[idx_top_left*3 +1]+img[idx_top*3 +1]+img[idx_top_right*3+1]+img[idx_left*3+1]+img[idx*3+1]+img[idx_right*3+1]+img[idx_bottom_left*3+1]+img[idx_bottom*3+1]+img[idx_bottom_right*3+1])* intensity/9;
-                blue = (img[idx_top_left*3+2]+img[idx_top*3+2]+img[idx_top_right*3+2]+img[idx_left*3+2]+img[idx*3+2]+img[idx_right*3+2]+img[idx_bottom_left*3+2]+img[idx_bottom*3+2]+img[idx_bottom_right*3+2])* intensity/9;
+                red = (img[idx_top_left*3]+img[idx_top*3]+img[idx_top_right*3]+img[idx_left*3]+img[idx*3]+img[idx_right*3]+img[idx_bottom_left*3]+img[idx_bottom*3]+img[idx_bottom_right*3]) /9;
+                green = (img[idx_top_left*3 +1]+img[idx_top*3 +1]+img[idx_top_right*3+1]+img[idx_left*3+1]+img[idx*3+1]+img[idx_right*3+1]+img[idx_bottom_left*3+1]+img[idx_bottom*3+1]+img[idx_bottom_right*3+1])/9;
+                blue = (img[idx_top_left*3+2]+img[idx_top*3+2]+img[idx_top_right*3+2]+img[idx_left*3+2]+img[idx*3+2]+img[idx_right*3+2]+img[idx_bottom_left*3+2]+img[idx_bottom*3+2]+img[idx_bottom_right*3+2])/9;
 
                 img_blur_serial[idx*3] = static_cast<unsigned char>(red);
                 img_blur_serial[idx*3 +1] = static_cast<unsigned char>(green);
