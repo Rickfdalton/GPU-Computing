@@ -1,14 +1,19 @@
 /*
 This is the parallel implementation of matrix multiplication of NXN matrix
-elapsed time GPU 8.25004
+using tiling method.
+elapsed time CPU 4111.5
+elapsed time GPU 4.62031
+Max_Diff 9.15527e-05
 
 */
 #include <iostream>
 #include <chrono>
 #include <cuda_runtime.h>
 
-
 using namespace std;
+
+// define as macro. this get resolved before compiling so no need to worry about copying to gpu 
+#define TILE_DIM 32
 
 /* Timer class to get the elapsed time*/
 class Timer{
@@ -31,17 +36,34 @@ public:
 Timer timer; //initiate timer
 
 //kernel impl
-__global__ void mat_mul_kernel(float* d_A, float* d_B, float* d_C,int N){
-    int j = blockIdx.x * blockDim.x + threadIdx.x;
-    int i = blockIdx.y * blockDim.y + threadIdx.y;
+__global__ void mat_mul_tile_kernel(float* d_A, float* d_B, float* d_C,int N){
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if(i<N && j<N ){
-        float val = 0;
-        for (int k=0; k< N; k++){
-            val+=d_A[i*N+k]*d_B[k*N+j];
-        }
-        d_C[i*N+j]=val;
+    // this is not global this is shared per block
+    __shared__ float A_s[TILE_DIM][TILE_DIM]; 
+    __shared__ float B_s[TILE_DIM][TILE_DIM];
+
+    float sum=0; // go in a register.
+
+    //per iteration we load corresponding A tile and B tile
+    //each thread (corr: each output element) loads no_tiles number of elements in A and no_tiles number of elements in B
+    unsigned int no_tiles =  (N + TILE_DIM - 1) / TILE_DIM;
+    for (unsigned int tile=0; tile< no_tiles; tile++){
+            A_s[threadIdx.y][threadIdx.x] = (row <N && (tile * TILE_DIM+ threadIdx.x)< N )? d_A[row * N + (tile * TILE_DIM+ threadIdx.x) ] :0.0f;
+            B_s[threadIdx.y][threadIdx.x] = (col <N && (tile * TILE_DIM+ threadIdx.y)< N )? d_B[(tile * TILE_DIM+ threadIdx.y)*N+ col] : 0.0f;
+
+            __syncthreads();
+       
+            for (unsigned int i=0; i< TILE_DIM ; i++){
+                sum+= A_s[threadIdx.y][i]*B_s[i][threadIdx.x];
+            }
+            __syncthreads();
     }
+    if(row < N && col < N){
+        d_C[row * N + col] = sum;
+    }
+    
 }
 
 void parallel_matrix_multiply(float* A, float*B, float*C, int N){
@@ -57,11 +79,11 @@ void parallel_matrix_multiply(float* A, float*B, float*C, int N){
 
 
     //kernel call
-    dim3 numThreadsPerBlock(16,16,1);
-    dim3 numBlocksPerGrid((N+16-1)/16, (N+16-1)/16, 1);
+    dim3 numThreadsPerBlock(TILE_DIM,TILE_DIM,1);
+    dim3 numBlocksPerGrid((N+TILE_DIM-1)/TILE_DIM, (N+TILE_DIM-1)/TILE_DIM, 1);
 
     timer.start();
-    mat_mul_kernel<<<numBlocksPerGrid,numThreadsPerBlock>>>(d_A,d_B,d_C,N);
+    mat_mul_tile_kernel<<<numBlocksPerGrid,numThreadsPerBlock>>>(d_A,d_B,d_C,N);
     cudaDeviceSynchronize();
     timer.stop();
     timer.print("GPU");
@@ -115,18 +137,18 @@ int main(){
 
     parallel_matrix_multiply(A,B,C_parallel,N);
 
+    float max_diff= 0.0f;
     for(int i=0;i<N;i++){
           for(int j=0;j<N;j++){
-            cout << C_parallel[i*N +j] -  C[i*N +j] << flush;
+            max_diff = std::max (std::abs(C_parallel[i*N +j] -  C[i*N +j]) , max_diff);
           }
-          cout<< endl;
     }
+    cout<< "Max_Diff "<< max_diff <<endl;
 
     delete[] A;
     delete[] B;
     delete[] C;
     delete[] C_parallel;
-
 
     return 0;
 }
