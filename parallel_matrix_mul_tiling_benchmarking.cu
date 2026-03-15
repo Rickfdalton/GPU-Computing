@@ -1,21 +1,14 @@
 /*
-This is the optimized parallel implementation of matrix multiplication of NXN matrix
-using tiling method.
-Here each thread is not assigned to each output element, but
-each thread is assigned to N output elemetns in same row which basicallly sits in same position in each grid.
+In this file we will compare the performance of custom mat mul kenerl with cuBLAS.
 
-[t_0][][]  [t_0][][]    [t_0][][]
-[][][]     [][][]        [][][]
-[][][]     [][][]        [][][]
-
-elapsed time CPU 4048.18
-elapsed time GPU 2.99956
+My kernel time2.32336ms
+cuBLAS time0.452465ms
 Max_Diff 9.15527e-05
-
 */
 #include <iostream>
 #include <chrono>
 #include <cuda_runtime.h>
+#include <cublas_v2.h>
 
 using namespace std;
 
@@ -35,10 +28,9 @@ public:
     void stop(){
         end_time= std::chrono::high_resolution_clock::now();
     }
-    void print(const char* label){
+    double get_elapsed(){
         std::chrono::duration<double, std::milli> elapsed = end_time - start_time;
-        double ms = elapsed.count();
-        std::cout<< "elapsed time "<< label<< " " << ms << std::endl;
+        return elapsed.count();
     }
 };
 Timer timer; //initiate timer
@@ -99,15 +91,65 @@ void parallel_matrix_multiply(float* A, float*B, float*C, int N){
     dim3 numThreadsPerBlock(TILE_DIM,TILE_DIM,1);
     dim3 numBlocksPerGrid((N+TILE_DIM-1)/(TILE_DIM*COARSE_FACTOR), (N+TILE_DIM-1)/TILE_DIM, 1);
 
+    // GPU warmup for custom kernel
+    for(int i=0;i<5;i++)
+        mat_mul_tile_kernel_opt<<<numBlocksPerGrid,numThreadsPerBlock>>>(d_A,d_B,d_C,N);
+
+    cudaDeviceSynchronize();
+
     timer.start();
-    mat_mul_tile_kernel_opt<<<numBlocksPerGrid,numThreadsPerBlock>>>(d_A,d_B,d_C,N);
+    for(int i=0; i< 50; i++)
+        mat_mul_tile_kernel_opt<<<numBlocksPerGrid,numThreadsPerBlock>>>(d_A,d_B,d_C,N);
     cudaDeviceSynchronize();
     timer.stop();
-    timer.print("GPU");
+    double my_ms = timer.get_elapsed();
+    std::cout << "My kernel time" << my_ms/50 << "ms" <<endl;
 
     //copy data from GPU
     cudaMemcpy(C,d_C,N*N*sizeof(float),cudaMemcpyDeviceToHost);
 
+    /*================ performance evaluation =================*/
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+
+    float alpha = 1.0f;
+    float beta  = 0.0f;
+
+    // GPU warmup for cuBLAS
+    for(int i=0;i<5;i++)
+    {
+        cublasSgemm(handle,
+                    CUBLAS_OP_N,
+                    CUBLAS_OP_N,
+                    N,N,N,
+                    &alpha,
+                    d_B,N,
+                    d_A,N,
+                    &beta,
+                    d_C,N);
+    }
+
+    cudaDeviceSynchronize();
+
+    timer.start();
+    for(int i=0;i<50;i++)
+    {
+        cublasSgemm(handle,
+                    CUBLAS_OP_N,
+                    CUBLAS_OP_N,
+                    N,N,N,
+                    &alpha,
+                    d_B,N,
+                    d_A,N,
+                    &beta,
+                    d_C,N);
+    }
+    cudaDeviceSynchronize();
+    timer.stop();
+    double cu_ms = timer.get_elapsed();
+    std::cout << "cuBLAS time" << cu_ms/50 <<"ms" << endl;
+
+    cublasDestroy(handle);
 
     //free GPU mem
     cudaFree(d_A);
@@ -147,11 +189,7 @@ int main(){
 
     }
 
-
-    timer.start();
     matrix_multiply(A,B,C,N);
-    timer.stop();
-    timer.print("CPU");
 
     parallel_matrix_multiply(A,B,C_parallel,N);
 
