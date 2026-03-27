@@ -1,6 +1,7 @@
 /*
 Profiling using vector addition example -old method
 We might need NVIDIA Nsight (new profiling) for new devices
+ncu (NVIDIA insight doesnt need additional configs in cuda code)
 */
 
 #include <iostream>
