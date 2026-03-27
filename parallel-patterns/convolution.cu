@@ -8,6 +8,7 @@ Parallel Pattern 1 : convolution
 #include <iostream>
 #include <chrono>
 #include <cuda_runtime.h>
+#include <algorithm>
 #include "stb_image.h"
 #include "stb_image_write.h"
 
@@ -22,33 +23,35 @@ constant memory
 we can only allocate 64KB of constant memory
 why constant memory is so small? we use SRAM for fast 
 */
-__constant__ char mask_c[MASK_DIM][MASK_DIM];
+__constant__ float mask_c[MASK_DIM][MASK_DIM];
 
 //kernel implementation
-__global__ void convolution_kernel(char* image_d, char* img_out_d,unsigned int width, unsigned int height){
+__global__ void convolution_kernel(unsigned char* image_d, unsigned char* img_out_d,unsigned int width, unsigned int height){
     unsigned int col = blockDim.x* blockIdx.x + threadIdx.x;
     unsigned int row = blockDim.y* blockIdx.y + threadIdx.y;
 
     if (col < width && row < height){
-        //loop through neighbouring elements and calculate weighted sum
-        float sum=0;
-        for(unsigned int idx=0; idx<MASK_DIM*MASK_DIM; idx++){
-            unsigned int i = idx / MASK_DIM ; //row
-            unsigned int j = idx % MASK_DIM ; //col
+        for (unsigned int channel=0; channel<3; channel++){
+            //loop through neighbouring elements and calculate weighted sum
+            float sum=0;
+            for(unsigned int idx=0; idx<MASK_DIM*MASK_DIM; idx++){
+                unsigned int i = idx / MASK_DIM ; //mask row
+                unsigned int j = idx % MASK_DIM ; //mask col
 
-            int i_neighbour = row + (i-MASK_RADIUS); //row
-            int j_neighbour = col + (j-MASK_RADIUS) ; //col
+                int i_neighbour = row + (i-MASK_RADIUS); //row
+                int j_neighbour = col + (j-MASK_RADIUS) ; //col
 
-            if(i_neighbour>=0 && i_neighbour< height && j_neighbour>=0 && j_neighbour<width ){
-                sum+= image_d[i_neighbour *width + j_neighbour] * mask_c[i][j];
+                if(i_neighbour>=0 && i_neighbour< height && j_neighbour>=0 && j_neighbour<width ){
+                    sum+= image_d[3*(i_neighbour *width + j_neighbour)+channel] * mask_c[i][j];
+                }
             }
+            sum = fminf(255.0f, fmaxf(0.0f, sum));
+            img_out_d[3*(row*width+col)+channel] = static_cast<unsigned char>(sum) ;
         }
-        img_out_d[row*width+col] = static_cast<char>sum ;
-
     }
 }
 
-void convolution(char mask[][MASK_DIM], unsigned char* img, unsigned char* img_out, unsigned int width, unsigned int height){
+void convolution(float mask[][MASK_DIM], unsigned char* img, unsigned char* img_out, unsigned int width, unsigned int height){
     //alocalte GPU memory
     unsigned char* image_d;
     unsigned char* img_out_d;
@@ -59,10 +62,9 @@ void convolution(char mask[][MASK_DIM], unsigned char* img, unsigned char* img_o
     cudaMemcpy(image_d,img,width*height*3*sizeof(char), cudaMemcpyHostToDevice);
 
     //copy mask to constant memory
-    cudaMemcpyToSymbol(mask_c,mask, MASK_DIM * MASK_DIM* sizeof(char));
+    cudaMemcpyToSymbol(mask_c,mask, MASK_DIM * MASK_DIM* sizeof(float));
 
     //call kernel
-    unsigned int no_threads= (width) *(height);
     dim3 threads_per_block(OUT_TILE_DIM,OUT_TILE_DIM,1);
     dim3 blocks_per_grid(( (width)+OUT_TILE_DIM -1)/OUT_TILE_DIM,((height)+OUT_TILE_DIM -1)/OUT_TILE_DIM);
 
@@ -89,7 +91,15 @@ int main(){
 
     unsigned char *img_out = new unsigned char[width * height * 3];// channel is 3
 
-    convolution(img,img_out,width,height);
+    float mask[MASK_DIM][MASK_DIM] = {
+        1/25.0, 1/25.0, 1/25.0, 1/25.0, 1/25.0,
+        1/25.0, 1/25.0, 1/25.0, 1/25.0, 1/25.0,
+        1/25.0, 1/25.0, 1/25.0, 1/25.0, 1/25.0,
+        1/25.0, 1/25.0, 1/25.0, 1/25.0, 1/25.0,
+        1/25.0, 1/25.0, 1/25.0, 1/25.0, 1/25.0
+    };
+
+    convolution(mask,img,img_out,width,height);
 
     stbi_write_png("convoluted-image.png", width, height, 3, img_out, width * 3);
     
