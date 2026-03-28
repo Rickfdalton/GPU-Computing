@@ -26,47 +26,52 @@ __constant__ float mask_c[MASK_DIM][MASK_DIM];
 __global__ void tiled_convolution_kernel(unsigned char* image_d, unsigned char* img_out_d,unsigned int width, unsigned int height){
     __shared__ float image_s[BLOCK_DIM][3*BLOCK_DIM];
 
-    int col = blockDim.x* blockIdx.x + threadIdx.x;
-    int row = blockDim.y* blockIdx.y + threadIdx.y;
+    int col = OUT_TILE_DIM* blockIdx.x + threadIdx.x;
+    int row = OUT_TILE_DIM* blockIdx.y + threadIdx.y;
 
     col =col- MASK_RADIUS;
     row =row- MASK_RADIUS;
 
-    //load to shared memory
+
     for (unsigned int channel=0; channel<3; channel++){
-        image_s[threadIdx.y][3*threadIdx.x + channel] = image_d[3*(row*width + col)+channel];
+        if (col >= 0 && col < width   && row >= 0 && row < height ){
+        //load to shared memory
+            image_s[threadIdx.y][3*threadIdx.x + channel] = image_d[3*(row*width + col)+channel];
+        }else {
+            image_s[threadIdx.y][3*threadIdx.x + channel] = 0.0f; 
+        }
     }
-    
+
     //sync
     __syncthreads();
 
-    //perform convolution
-    for (unsigned int channel=0; channel<3; channel++){
-        /*  calculation is not for all the tile elements. so not all threads will now calculating its pixel
-            now we calculate only for tile (which is smaller than our block)
-            now control divergence comes in
-        */
-        if (threadIdx.x >= (MASK_RADIUS) && threadIdx.x < (BLOCK_DIM - MASK_RADIUS) && threadIdx.y>= (MASK_RADIUS ) && threadIdx.y < (BLOCK_DIM - MASK_RADIUS)){
-                float sum=0;
-                for(unsigned int idx=0; idx<MASK_DIM*MASK_DIM; idx++){
-                    unsigned int i = idx / MASK_DIM ; //mask row
-                    unsigned int j = idx % MASK_DIM ; //mask col
+    if (col >= 0 && col < width   && row >= 0 && row < height ){
+            for (unsigned int channel=0; channel<3; channel++){
+                /*  calculation is not for all the tile elements. so not all threads will now calculating its pixel
+                    now we calculate only for tile (which is smaller than our block)
+                    now control divergence comes in
+                */
+                if (threadIdx.x >= (MASK_RADIUS) && threadIdx.x < (BLOCK_DIM - MASK_RADIUS) && threadIdx.y>= (MASK_RADIUS ) && threadIdx.y < (BLOCK_DIM - MASK_RADIUS)){
+                        float sum=0;
+                        for(unsigned int idx=0; idx<MASK_DIM*MASK_DIM; idx++){
+                            unsigned int i = idx / MASK_DIM ; //mask row
+                            unsigned int j = idx % MASK_DIM ; //mask col
 
-                    int i_neighbour = threadIdx.y + (i-MASK_RADIUS); //row
-                    int j_neighbour = threadIdx.x + (j-MASK_RADIUS) ; //col
+                            int i_neighbour = threadIdx.y + (i-MASK_RADIUS); //row
+                            int j_neighbour = threadIdx.x + (j-MASK_RADIUS) ; //col
 
-                    if(i_neighbour>=0 && i_neighbour< BLOCK_DIM && j_neighbour>=0 && j_neighbour<BLOCK_DIM ){
-                        sum+= image_s[i_neighbour][3*j_neighbour + channel] * mask_c[i][j];
-                    }
+                            sum+= image_s[i_neighbour][3*j_neighbour + channel] * mask_c[i][j];
+                            
+                        }
+                        sum = fminf(255.0f, fmaxf(0.0f, sum));
+                        img_out_d[3*(row*width+col)+channel] = static_cast<unsigned char>(sum) ;
                 }
-                sum = fminf(255.0f, fmaxf(0.0f, sum));
-                img_out_d[3*(row*width+col)+channel] = static_cast<unsigned char>(sum) ;
-        }
+            }
     }
-    
+
     //sync
      __syncthreads();
-}
+    }
 
 void convolution(float mask[][MASK_DIM], unsigned char* img, unsigned char* img_out, unsigned int width, unsigned int height){
     //alocalte GPU memory
