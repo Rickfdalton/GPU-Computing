@@ -129,3 +129,25 @@ int main(){
     delete[] img_out;
     return 0;
 }
+
+/*
+Notes:
+
+Compute to Memory ratio:
+Without tiling:
+Each thread loads MASK_DIMxMASK_DIM elements = 4 * MASK_DIMxMASK_DIM bytes
+Each thred performs FLOPS = 2 x MASK_DIMxMASK_DIM operations
+Compute to Memory ratio = 0.5
+
+With tiling:
+Each thread block loads (OUT_TILE_DIM +MASK_DIM -1 )ˆ2 elements
+Each thread block performs (OUT_TILE_DIM)ˆ2 x 2 x MASK_DIMxMASK_DIM operations
+Compute to Memory ratio = (OUT_TILE_DIM)ˆ2 x2 x MASK_DIMxMASK_DIM )/ (OUT_TILE_DIM +MASK_DIM -1 )ˆ2 x 4
+
+In our case:
+16, 5
+Compute to memory ratio = (16*16*2*25)/(20*20*4) = 8
+
+0.5 -> 8 !! 16x improvement
+
+*/
