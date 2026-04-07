@@ -1,5 +1,5 @@
-TARGET = stencil-3d-tiled
-SRC = stencil-3d-tiled.cu
+TARGET = reduction
+SRC = reduction.cu
 
 all:
 	nvcc -arch=sm_75 $(SRC) -o $(TARGET)
