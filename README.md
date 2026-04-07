@@ -1,12 +1,42 @@
-This repository consists of the code samples for the scenarios discussed in course GPU Computing, Spring 2021, Izzat El Hajj.
+# GPU Computing with CUDA
 
-https://youtu.be/c8dehGOB8mQ?si=hN0lNLLc1ef0VAq4
+This repository contains CUDA code samples.
 
-Requirement for the cuda programs to run :
-CUDA supported GPU, nvcc compiler
+**🎥 Course Reference:**  
 
-If you do not have such, run the samples with the help of google colab.  
-check: https://www.reddit.com/r/MachineLearning/comments/151n4te/d_practice_cuda_without_an_actual_nvidia_gpu/
+[GPU Computing course (Spring 2021) by Izzat El Hajj](https://youtu.be/c8dehGOB8mQ?si=hN0lNLLc1ef0VAq4)
 
-Matrix Multiplication article:
-https://marshall5.medium.com/mastering-matrix-multiplication-in-cuda-13275162c1cc
+---
+
+## Requirements
+
+- **CUDA-capable GPU**  
+- **nvcc compiler**
+
+> No GPU? You can run the samples on **Google Colab**:  
+> [Practice CUDA without a GPU](https://www.reddit.com/r/MachineLearning/comments/151n4te/d_practice_cuda_without_an_actual_nvidia_gpu/)
+
+---
+
+## Highlights
+
+- Parallel implementation of **RGB to grayscale conversion**  
+- **Matrix multiplication** with tiling and optimization  
+- **Image convolution and blurring** 
+- **Stencil computations** (3D)  
+- **Performance profiling** with NVIDIA tools
+- **Parallel patterns**
+
+**💡 Article:**  
+[Mastering Matrix Multiplication in CUDA](https://marshall5.medium.com/mastering-matrix-multiplication-in-cuda-13275162c1cc)
+
+---
+
+## Structure
+
+```text
+parallel-patterns/      # Parallel pattern examples
+*.cu, *.cpp             # CUDA and C++ programs
+*.png, *.jpg            # Example images
+run.ipynb               # Notebook for quick testing
+*.prof, timeline.prof   # Profiling outputs
