@@ -13,12 +13,12 @@ __global__ void reduction_kernel(float* input_d, float* partial_sums_d, unsigned
     __shared__ float input_block_s[2* BLOCK_DIM];
 
     //store to shared memory
-    if((blockDim.x * blockIdx.x + (threadIdx.x * 2))< N){
+    if((2*blockDim.x * blockIdx.x + (threadIdx.x * 2))< N){
         input_block_s[threadIdx.x * 2]=input_d[2*blockDim.x * blockIdx.x + (threadIdx.x * 2)];
     }else{
         input_block_s[threadIdx.x * 2]=0.0f;
     } 
-    if((blockDim.x * blockIdx.x + (threadIdx.x * 2)+1)< N){
+    if((2*blockDim.x * blockIdx.x + (threadIdx.x * 2)+1)< N){
         input_block_s[1+ threadIdx.x * 2]=input_d[2*blockDim.x * blockIdx.x + (threadIdx.x * 2)+1];
     }else{
         input_block_s[1+ threadIdx.x * 2]=0.0f;
