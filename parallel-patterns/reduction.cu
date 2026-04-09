@@ -75,18 +75,57 @@ float reduce_gpu(float* input, unsigned int N){
 
 }
 
+/*
+Driver code - claude generated
+*/
 int main(){
-
-    const int N= 2048;
-    float input[N];
-
-    for(int i=0; i< N; i++){
-        input[i]=1.0;
+    // Test parameters
+    int N = 10000000;  // 10 million elements
+    
+    // Allocate host memory
+    float* input = (float*)malloc(N * sizeof(float));
+    
+    // Initialize with values (1.0f for easy verification)
+    for(int i = 0; i < N; i++){
+        input[i] = 1.0f;  // Sum should be N
     }
-
-    float sum= reduce_gpu(input, N);
-
-    std::cout<< "sum" << sum << endl;
-
+    
+    // GPU reduction
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    
+    cudaEventRecord(start);
+    float gpu_sum = reduce_gpu(input, N);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    
+    float gpu_time = 0;
+    cudaEventElapsedTime(&gpu_time, start, stop);
+    
+    // CPU reduction for verification
+    float cpu_sum = 0.0f;
+    for(int i = 0; i < N; i++){
+        cpu_sum += input[i];
+    }
+    
+    // Verify results
+    printf("N = %d\n", N);
+    printf("CPU Sum: %.2f\n", cpu_sum);
+    printf("GPU Sum: %.2f\n", gpu_sum);
+    printf("Error: %.6f\n", fabs(cpu_sum - gpu_sum));
+    printf("GPU Time: %.3f ms\n", gpu_time);
+    
+    if(fabs(cpu_sum - gpu_sum) < 1e-3){
+        printf("✓ PASSED!\n");
+    } else {
+        printf("✗ FAILED!\n");
+    }
+    
+    // Cleanup
+    free(input);
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+    
     return 0;
 }
