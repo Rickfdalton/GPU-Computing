@@ -1,5 +1,7 @@
 /*
-Parallel pattern 3 : reduction
+reduction but with thread coarsening
+
+kernel time - 237.54 micro seconds 
 */
 
 #include <iostream>
@@ -7,30 +9,25 @@ Parallel pattern 3 : reduction
 #include <cuda_runtime.h>
 
 #define BLOCK_DIM 1024
+#define COARSE_FACTOR 4
 using namespace std;
 
+
 __global__ void reduction_kernel(float* input_d, float* partial_sums_d, unsigned int N){
-    __shared__ float input_block_s[2* BLOCK_DIM];
+    __shared__ float input_block_s[BLOCK_DIM];
 
-    //store to shared memory
-    if((2*blockDim.x * blockIdx.x + (threadIdx.x * 2))< N){
-        input_block_s[threadIdx.x * 2]=input_d[2*blockDim.x * blockIdx.x + (threadIdx.x * 2)];
-    }else{
-        input_block_s[threadIdx.x * 2]=0.0f;
-    } 
-    if((2*blockDim.x * blockIdx.x + (threadIdx.x * 2)+1)< N){
-        input_block_s[1+ threadIdx.x * 2]=input_d[2*blockDim.x * blockIdx.x + (threadIdx.x * 2)+1];
-    }else{
-        input_block_s[1+ threadIdx.x * 2]=0.0f;
+    int id =  (blockDim.x * 2 * COARSE_FACTOR) * blockIdx.x  + threadIdx.x;
+
+    float sum_intial =0.0f;
+    for(int i=0; i<COARSE_FACTOR*2; i++){
+        sum_intial+= input_d[i*BLOCK_DIM + id];
     }
-
+    input_block_s[threadIdx.x]=sum_intial;
     __syncthreads();
-
  
-    for(int stride=1; stride< 2*blockDim.x; stride*=2){
-        int idx = 2*stride*threadIdx.x;
-        if (idx < 2 * blockDim.x) {
-        input_block_s[idx]+=input_block_s[idx +stride];
+    for(int stride=BLOCK_DIM/2; stride>0; stride/=2){
+        if (threadIdx.x <stride) {
+            input_block_s[threadIdx.x]+= input_block_s[threadIdx.x+stride];
         }
         __syncthreads();
     }
@@ -48,7 +45,7 @@ float reduce_gpu(float* input, unsigned int N){
     cudaMemcpy(input_d, input,N*sizeof(float), cudaMemcpyHostToDevice);
 
     int threadsPerBlock = BLOCK_DIM;
-    int elementsPerBlock = 2*threadsPerBlock;
+    int elementsPerBlock = 2*threadsPerBlock*COARSE_FACTOR;
     int blocksPerGrid = (N+elementsPerBlock-1)/elementsPerBlock;
 
     //allocate partial sums

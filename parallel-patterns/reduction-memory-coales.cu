@@ -7,8 +7,7 @@ we utilize memory coalescing
 /*
 thoery: instead of adding elements by stride,
 if 8 elements in block, the 4 threads will add first 4 elements with last 4 elements.
-
-but slow than our shared memory code!
+kernel time 633.02 micro seconds
 */
 
 #include <iostream>

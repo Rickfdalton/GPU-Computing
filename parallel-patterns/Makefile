@@ -1,5 +1,5 @@
-TARGET = reduction
-SRC = reduction.cu
+TARGET = reduction-memory-coales
+SRC = reduction-memory-coales.cu
 
 all:
 	nvcc -arch=sm_75 $(SRC) -o $(TARGET)
