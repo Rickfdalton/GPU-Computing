@@ -1,5 +1,5 @@
-TARGET = reduction-memory-coales
-SRC = reduction-memory-coales.cu
+TARGET = kogge-stone-scan
+SRC = kogge-stone-scan.cu
 
 all:
 	nvcc -arch=sm_75 $(SRC) -o $(TARGET)
