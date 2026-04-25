@@ -1,5 +1,5 @@
-TARGET = kogge-stone-scan
-SRC = kogge-stone-scan.cu
+TARGET = brent-kung-scan
+SRC = brent-kung-scan.cu
 
 all:
 	nvcc -arch=sm_75 $(SRC) -o $(TARGET)
