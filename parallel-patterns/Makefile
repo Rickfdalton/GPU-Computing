@@ -1,5 +1,5 @@
-TARGET = brent-kung-scan-exclusive
-SRC = brent-kung-scan-exclusive.cu
+TARGET = histogram
+SRC = histogram.cu
 
 all:
 	nvcc -arch=sm_75 $(SRC) -o $(TARGET)
