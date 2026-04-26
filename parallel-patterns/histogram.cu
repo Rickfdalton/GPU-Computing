@@ -1,6 +1,11 @@
 /*
 Histogram of pixel values of a image
 */
+
+/*
+Privatization:
+we have a private copy of the output for each block and then after processing each block the global copy is updated
+*/
 #define STB_IMAGE_IMPLEMENTATION
 
 #include <iostream>
@@ -12,7 +17,6 @@ Histogram of pixel values of a image
 
 using namespace std;
 
-
 void histogram_gpu(unsigned char* image, unsigned int* bins, unsigned int width, unsigned int height);
 
 __global__ void histogram_kernel(unsigned char* image, unsigned int* bins, unsigned int width, unsigned int height){
@@ -21,11 +25,24 @@ __global__ void histogram_kernel(unsigned char* image, unsigned int* bins, unsig
     int col = blockDim.x * blockIdx.x + threadIdx.x;
     int idx = row * width + col;
 
+    __shared__ unsigned int private_bins[NUM_BINS];
+    
+    int local_idx = blockDim.x *threadIdx.y + threadIdx.x;
+    private_bins[local_idx]=0;
+    __syncthreads();
+
     unsigned int pixel = 0;
     if(row<height && col<width){
         pixel = image[idx];
-        atomicAdd(&bins[pixel], 1);
+        atomicAdd(&private_bins[pixel], 1);
     }
+
+    __syncthreads();
+
+    if(row<height && col<width){
+        atomicAdd(&bins[local_idx],private_bins[local_idx]);
+    }
+    
 }
 
 void histogram_gpu(unsigned char* image, unsigned int* bins, unsigned int width, unsigned int height){
