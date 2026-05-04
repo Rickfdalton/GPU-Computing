@@ -1,5 +1,5 @@
-TARGET = histogram
-SRC = histogram.cu
+TARGET = merge
+SRC = merge.cu
 
 all:
 	nvcc -arch=sm_75 $(SRC) -o $(TARGET)
