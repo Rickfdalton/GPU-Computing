@@ -61,18 +61,54 @@ each thread is responsible for calculating element for each index of output arra
 #define ELEM_PER_BLOCK (ELEM_PER_THREAD*THREADS_PER_BLOCK)
 
 __global__ void merge_kernel(float* A, float* B, float* C,   int m,   int n){
-      int c = blockDim.x * blockIdx.x + threadIdx.x;
-      int k = c* ELEM_PER_THREAD;
+    //find block's segments
+    int kBlock =  blockIdx.x* ELEM_PER_BLOCK;
+    int kNextBlock = (blockIdx.x < gridDim.x -1) ? kBlock+ELEM_PER_BLOCK: m+n;
 
-    if(k < m+n){
-          int i = coRank(A, B, m,n,k);
-          int j = k - i;
-          int kNext = (k + ELEM_PER_THREAD ) < m+n ? k+ ELEM_PER_THREAD : m+n ;
-          int iNext = coRank(A,B,m,n,kNext);
-          int jNext = kNext - iNext;
-        merge_seq(&A[i], &B[j], &C[k],iNext-i,jNext-j);
+    __shared__ int iBlock;
+    __shared__ int iNextBlock;
+
+    if(threadIdx.x == 0){
+        iBlock = coRank(A,B,m,n,kBlock);
+        iNextBlock = coRank(A,B,m,n,kNextBlock);
     }
-    
+    __syncthreads();
+    int jBlock = kBlock-iBlock;
+    int jNextBlock = kNextBlock - iNextBlock;
+
+    __shared__ float A_s[ELEM_PER_BLOCK];
+    __shared__ float B_s[ELEM_PER_BLOCK];
+
+    int mBlock = iNextBlock - iBlock;
+    int nBlock = jNextBlock - jBlock;
+
+    for(int i= threadIdx.x; i<mBlock; i+=blockDim.x){
+        A_s[i]=A[iBlock+i];
+    }
+
+    for(int j= threadIdx.x; j<nBlock; j+=blockDim.x){
+        B_s[j]=B[jBlock+j];
+    }
+    __syncthreads();
+
+    // merge
+    __shared__ float C_s[ELEM_PER_BLOCK];
+    int k = threadIdx.x* ELEM_PER_THREAD;
+
+    if(k < mBlock + nBlock){
+          int i = coRank(A_s, B_s, mBlock,nBlock,k);
+          int j = k - i;
+          int kNext = (k + ELEM_PER_THREAD ) < mBlock+nBlock ? k+ ELEM_PER_THREAD : mBlock+nBlock ;
+          int iNext = coRank(A_s,B_s,mBlock,nBlock,kNext);
+          int jNext = kNext - iNext;
+        merge_seq(&A_s[i], &B_s[j], &C_s[k],iNext-i,jNext-j);
+    }
+    __syncthreads();
+
+    //write to global memory
+    for(int k= threadIdx.x; k<mBlock+nBlock; k+=blockDim.x){
+        C[kBlock+k]=C_s[k];
+    }
 }
 
 void merge_gpu(float* A, float* B, float* C,   int m,   int n){
