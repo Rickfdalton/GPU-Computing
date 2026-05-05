@@ -1,5 +1,5 @@
-TARGET = merge
-SRC = merge.cu
+TARGET = radix-sort
+SRC = radix-sort.cu
 
 all:
 	nvcc -arch=sm_75 $(SRC) -o $(TARGET)
