@@ -1,32 +1,11 @@
 #include <iostream>
 #include <cuda_runtime.h>
+#include <random>
+#include <algorithm>
 
-
-__device__ void merge_seq(float* A, float* B, float* C,   int m,   int n);
 __device__   int coRank(float* A, float* B,   int m,   int n,   int k);
 __device__ void merge(float* A, float* B, float* C,   int m,   int n);
 __global__ void merge_sort_kernel(float* src, float* dst, int N, int width);
-
-/* merging 2 sorted array */
-__device__ void merge_seq(float* A, float* B, float* C,   int m,   int n){
-      int i=0;
-      int j=0;
-      int k=0;
-
-    while(i<m and j<n){
-        if(A[i]<=B[j]){
-            C[k++]=A[i++];
-        }else{
-            C[k++]=B[j++];
-        }
-    }
-    while(i<m){
-        C[k++]=A[i++];
-    }
-    while(j<n){
-        C[k++]=B[j++];
-    }
-}
 
 
 /*
@@ -38,17 +17,17 @@ __device__   int coRank(float* A, float* B,   int m,   int n,   int k){
       int low = max(k-n,0);
       int high = min(k,m);
 
-    while (true){
+    while (low < high){
           int i = (low+high)/2;
           int j = k-i;
         if(i>0 && j<n && A[i-1]>B[j]){
             high=i;
         }else if(j>0 && i<m && B[j-1]>A[i]){
-            low=i;
+            low=i+1;
         }else{
             return i;
         }
-    }
+    }return low;
 }
 
 /*
@@ -58,7 +37,7 @@ each thread is responsible for calculating element for each index of output arra
 #define BLOCK_SIZE 1024
 
 
-__device__ void merge(float* A, float* B, float* C,   int m,   int n){
+__device__ void merge(float* A, float* B, float* C,   int m,   int n, int stride){
 
     extern __shared__ float shared[];
     float* A_s = shared;
@@ -68,6 +47,7 @@ __device__ void merge(float* A, float* B, float* C,   int m,   int n){
     for(int i= threadIdx.x; i<m; i+=blockDim.x){
         A_s[i]=A[i];
     }
+    __syncthreads();
 
     for(int j= threadIdx.x; j<n; j+=blockDim.x){
         B_s[j]=B[j];
@@ -80,10 +60,7 @@ __device__ void merge(float* A, float* B, float* C,   int m,   int n){
     if(k < m + n){
           int i = coRank(A_s, B_s, m,n,k);
           int j = k - i;
-          int kNext = (k + 1 ) < m+n ? k+ 1 : m+n ;
-          int iNext = coRank(A_s,B_s,m,n,kNext);
-          int jNext = kNext - iNext;
-        merge_seq(&A_s[i], &B_s[j], &C_s[k],iNext-i,jNext-j);
+          C_s[k] = (j == n || (i < m && A_s[i] <= B_s[j])) ? A_s[i] : B_s[j];
     }
     __syncthreads();
 
@@ -105,7 +82,8 @@ __global__ void merge_sort_kernel(float* src, float* dst, int N, int width){
             &src[right],
             &dst[left],
             m,
-            n
+            n,
+            width
         );
     }else{
         for(int i = threadIdx.x; i < min(width, N-left); i += blockDim.x)
@@ -123,9 +101,9 @@ void merge_sort_gpu(float* A,int N){
 
     cudaMemcpy(A_d, A, N*sizeof(float), cudaMemcpyHostToDevice);
 
-    for(int level=1; level< N; level*=2){
-    int blocks_per_grid = (N+2*level -1)/(2*level) ;
-        merge_sort_kernel <<<blocks_per_grid, BLOCK_SIZE , 4*level*sizeof(float)>>> (A_d, C_d, N, level);
+    for(int stride=1; stride< N; stride*=2){
+    int blocks_per_grid = (N+2*stride -1)/(2*stride) ;
+        merge_sort_kernel <<<blocks_per_grid, BLOCK_SIZE , 4*stride*sizeof(float)>>> (A_d, C_d, N, stride);
         float *temp = C_d;
         C_d = A_d;
         A_d = temp;
@@ -139,27 +117,36 @@ void merge_sort_gpu(float* A,int N){
 
 
 /*
-Driver code 
+Driver code - LLM generated
 */
-int main(){
-    int N = 16;
 
+int main(){
+    int N = 1001;
     float *A = new float[N];
 
-    // Initialize sorted arrays
-    for(  int i = 0; i < N; i++){
-        A[i] = (N-i) * 2.0f;      
+    // Initialize random array
+    for(int i = 0; i < N; i++){
+        A[i] = (float)drand48() * 2000.0f - 1000.0f;
     }
 
-    // Run GPU merge
-    merge_sort_gpu(A,N);
+    std::cout << "Before sort:\n";
+    for(int i = 0; i < 20; i++){
+        std::cout << A[i] << " ";
+    }
+    std::cout << "\n\n";
 
-    // Print result
-    std::cout << "Sorted array:\n";
-    for(  int i = 0; i < N; i++){
+    // Run GPU merge sort
+    merge_sort_gpu(A, N);
+
+    std::cout << "After sort:\n";
+    for(int i = 0; i < 20; i++){
         std::cout << A[i] << " ";
     }
     std::cout << "\n";
+
+    // Check if sorted using std::is_sorted
+    bool is_sorted = std::is_sorted(A, A + N);
+    std::cout << "Array is " << (is_sorted ? "sorted" : "not sorted") << "\n";
 
     delete[] A;
     return 0;
